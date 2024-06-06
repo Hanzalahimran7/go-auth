@@ -1,7 +1,9 @@
 package goauth
 
 import (
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,12 +24,21 @@ func Initialise() *App {
 	router.Use(middleware.Logger)
 	router.Use(middleware.RequestID)
 	router.Use(timeoutRequestMiddleware)
-	var db store.DatabaseStore = nil
+	db := store.NewPostgresDB(
+		os.Getenv("HOST"),
+		os.Getenv("PORT"),
+		os.Getenv("USER"),
+		os.Getenv("PASSWORD"),
+		os.Getenv("DB"),
+	)
+	if err := db.RunMigration(); err != nil {
+		log.Fatal(err)
+	}
 	controller := controller.GetController(db)
 	return &App{
 		Router:     router,
 		DB:         db,
-		Controller: *controller,
+		Controller: controller,
 	}
 }
 

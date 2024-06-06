@@ -12,4 +12,5 @@ type DatabaseStore interface {
 	GetUser(ctx context.Context, username string) (*model.User, error)
 	DeleteUser(ctx context.Context, username string) error
 	UpdateUser(ctx context.Context, user *model.User) error
+	FindByEmail(ctx context.Context, email string) error
 }

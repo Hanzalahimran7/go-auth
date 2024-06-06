@@ -80,3 +80,10 @@ func (p *PostgresDB) DeleteUser(ctx context.Context, username string) error {
 func (p *PostgresDB) UpdateUser(ctx context.Context, user *model.User) error {
 	return nil
 }
+
+func (p *PostgresDB) FindByEmail(ctx context.Context, email string) error {
+	if err := p.db.QueryRow("SELECT email from users where email = $1", email).Scan(); err != nil {
+		return err
+	}
+	return nil
+}

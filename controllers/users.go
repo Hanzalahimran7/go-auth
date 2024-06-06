@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -29,6 +30,14 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) {
 	// Gets the signup request data from request's body and save it in userRequest
 	// In case of errors, send a bad request status
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := uc.db.FindByEmail(r.Context(), userRequest.Email); err == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("email already exists"))
+		return
+	} else if err != nil && err != sql.ErrNoRows {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

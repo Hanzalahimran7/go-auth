@@ -1,7 +1,8 @@
 package main
 
-import "fmt"
+import goauth "github.com/hanzalahimran7/go-auth/app"
 
 func main() {
-	fmt.Println("Hello World!")
+	app := goauth.Initialise()
+	app.Run()
 }

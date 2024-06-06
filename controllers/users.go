@@ -3,6 +3,7 @@ package controller
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -20,36 +21,37 @@ func GetController(db store.DatabaseStore) UserController {
 	return UserController{db}
 }
 
-func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) {}
+func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
 
-func (uc *UserController) Logout(w http.ResponseWriter, r *http.Request) {}
+func (uc *UserController) Logout(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
 
-func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) {
+func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int, error) {
 	// The handler register a new user into the system
 	userRequest := model.SignupRequest{}
-	// Gets the signup request data from request's body and save it in userRequest
-	// In case of errors, send a bad request status
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return http.StatusBadRequest, fmt.Errorf("INVALID REQUEST BODY")
 	}
+
+	// Input validation
+	if err := utils.ValidateUserRequest(userRequest); err != nil {
+		return http.StatusBadRequest, err
+	}
+
+	// Check if email already exists
 	if err := uc.db.FindByEmail(r.Context(), userRequest.Email); err == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("email already exists"))
-		return
+		return http.StatusBadRequest, fmt.Errorf("EMAIL ALREADY EXISTS")
 	} else if err != nil && err != sql.ErrNoRows {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return http.StatusBadRequest, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-	// Encrypt the user password and throw bad request in case of errors
+
+	// Encrypt the user password
 	encryptedPassword, err := utils.EncryptPassword(userRequest.Password)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return http.StatusBadRequest, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-	// Create a new UUID for user
+
 	userId := uuid.New()
-	// Get current time for created at
+	// Create new user
 	createdAt := time.Now().UTC()
 	user := model.User{
 		Id:        userId,
@@ -59,17 +61,26 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) {
 		Password:  encryptedPassword,
 		CreatedAt: &createdAt,
 	}
+
+	// Save the user in DB
 	if err := uc.db.Signup(r.Context(), &user); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(err)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
+
+	//Send the response to client
+	utils.WriteJSON(w, http.StatusCreated, user)
+	return 0, nil
 }
 
-func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) {}
+func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
 
-func (uc *UserController) DeleteProfile(w http.ResponseWriter, r *http.Request) {}
+func (uc *UserController) DeleteProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
 
-func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) {}
+func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}

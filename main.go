@@ -2,8 +2,10 @@ package main
 
 import (
 	"log"
+	"os"
 
 	goauth "github.com/hanzalahimran7/go-auth/app"
+	"github.com/hanzalahimran7/go-auth/store"
 	"github.com/joho/godotenv"
 )
 
@@ -16,5 +18,13 @@ func init() {
 
 func main() {
 	app := goauth.Initialise()
+	app.IntialiseDb(store.NewPostgresDB(
+		os.Getenv("HOST"),
+		os.Getenv("PORT"),
+		os.Getenv("USER"),
+		os.Getenv("PASSWORD"),
+		os.Getenv("DB"),
+	))
+	app.DB.RunMigration()
 	app.Run()
 }

@@ -1,6 +1,7 @@
 package goauth
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -38,6 +39,7 @@ func (a *App) IntialiseDb(s store.DatabaseStore) {
 
 func (a *App) Run() {
 	a.LoadRoutes()
+	log.Println("Starting the server")
 	http.ListenAndServe(":3000", a.Router)
 }
 

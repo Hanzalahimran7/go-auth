@@ -82,8 +82,12 @@ func (p *PostgresDB) UpdateUser(ctx context.Context, user *model.User) error {
 }
 
 func (p *PostgresDB) FindByEmail(ctx context.Context, email string) error {
-	if err := p.db.QueryRow("SELECT email from users where email = $1", email).Scan(); err != nil {
+	var emailInDB string
+	if err := p.db.QueryRow("SELECT email from users where email = $1", email).Scan(&emailInDB); err != nil {
 		return err
+	}
+	if emailInDB == email {
+		return fmt.Errorf("email already exists")
 	}
 	return nil
 }

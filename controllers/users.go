@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -18,7 +19,9 @@ type UserController struct {
 }
 
 func GetController(db store.DatabaseStore) UserController {
-	return UserController{db}
+	return UserController{
+		db: db,
+	}
 }
 
 func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
@@ -31,17 +34,22 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 	if err := json.NewDecoder(r.Body).Decode(&userRequest); err != nil {
 		return http.StatusBadRequest, fmt.Errorf("INVALID REQUEST BODY")
 	}
-
+	log.Println("******----------------------*********")
 	// Input validation
 	if err := utils.ValidateUserRequest(userRequest); err != nil {
+		log.Printf("Invalid signup request: %v\nThe request body is %v\n", err, userRequest)
 		return http.StatusBadRequest, err
 	}
+	log.Printf("User with email %s is signing up\n", userRequest.Email)
 
 	// Check if email already exists
-	if err := uc.db.FindByEmail(r.Context(), userRequest.Email); err == nil {
-		return http.StatusBadRequest, fmt.Errorf("EMAIL ALREADY EXISTS")
-	} else if err != nil && err != sql.ErrNoRows {
-		return http.StatusBadRequest, fmt.Errorf("INTERNAL SERVER ERROR")
+	log.Printf("Checking if the email %s exists in DB\n", userRequest.Email)
+	err := uc.db.FindByEmail(r.Context(), userRequest.Email)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Printf("Email %s already exists in Database\n", userRequest.Email)
+			return http.StatusBadRequest, err
+		}
 	}
 
 	// Encrypt the user password
@@ -63,11 +71,13 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 	}
 
 	// Save the user in DB
+	log.Printf("Writing user %s to Database\n", userRequest.Email)
 	if err := uc.db.Signup(r.Context(), &user); err != nil {
+		log.Printf("Failed to write user %s to Database\n", userRequest.Email)
 		w.WriteHeader(http.StatusInternalServerError)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-
+	log.Printf("User %s created with email %s\n", user.Id, userRequest.Email)
 	//Send the response to client
 	utils.WriteJSON(w, http.StatusCreated, user)
 	return 0, nil

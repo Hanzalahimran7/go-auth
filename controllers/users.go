@@ -65,9 +65,12 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, er
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
 	log.Printf("%s Login request Successful\n", loginRequest.Email)
-	w.Header().Add("Authorization", jwtToken)
-	w.Header().Add("Refresh", refreshToken)
-	utils.WriteJSON(w, http.StatusCreated, user)
+	w.Header().Add("Authorization", fmt.Sprintf("Bearer %s", jwtToken))
+	res := model.LoginResponse{
+		ID:           user.Id,
+		RefreshToken: refreshToken,
+	}
+	utils.WriteJSON(w, http.StatusAccepted, res)
 	return 0, nil
 }
 
@@ -139,9 +142,12 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 	}
 	//Send the response to client
 	// Add JWT and Refresh Token to the auth header
-	w.Header().Add("Authorization", jwtToken)
-	w.Header().Add("Refresh", refreshToken)
-	utils.WriteJSON(w, http.StatusCreated, user)
+	w.Header().Add("Authorization", fmt.Sprintf("Bearer %s", jwtToken))
+	res := model.LoginResponse{
+		ID:           user.Id,
+		RefreshToken: refreshToken,
+	}
+	utils.WriteJSON(w, http.StatusCreated, res)
 	return 0, nil
 }
 

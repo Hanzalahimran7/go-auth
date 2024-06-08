@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hanzalahimran7/go-auth/model"
+	"github.com/hanzalahimran7/go-auth/utils"
 	_ "github.com/lib/pq"
 )
 
@@ -66,13 +67,27 @@ func (p *PostgresDB) Signup(ctx context.Context, user *model.User) error {
     `
 	_, err := p.db.ExecContext(ctx, query, user.Id, user.FirstName, user.LastName, user.Email, user.Password, user.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("Failed to Signup: %w", err)
+		return fmt.Errorf("FAILED TO SIGN UP: %w", err)
 	}
 	return nil
 }
 
-func (p *PostgresDB) Login(ctx context.Context, username string, password string) (*model.User, error) {
-	return nil, nil
+func (p *PostgresDB) Login(ctx context.Context, email string, password string) (model.User, error) {
+	user := model.User{}
+	if err := p.db.QueryRow("SELECT * from users where email = $1", email).Scan(
+		&user.Id,
+		&user.FirstName,
+		&user.LastName,
+		&user.Email,
+		&user.Password,
+		&user.CreatedAt,
+	); err != nil {
+		return model.User{}, err
+	}
+	if !utils.CheckPasswordHash(password, user.Password) {
+		return model.User{}, fmt.Errorf("INVALID PASSWORD")
+	}
+	return user, nil
 }
 
 func (p *PostgresDB) GetUser(ctx context.Context, username string) (*model.User, error) {

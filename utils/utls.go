@@ -57,6 +57,19 @@ func ValidateUserRequest(userRequest model.SignupRequest) error {
 	return nil
 }
 
+func ValidateLoginRequest(userRequest model.LoginRequest) error {
+	if userRequest.Email == "" || userRequest.Password == "" {
+		return fmt.Errorf("all fields are required")
+	}
+	if !isValidEmail(userRequest.Email) {
+		return fmt.Errorf("invalid email address")
+	}
+	if len(userRequest.Password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+	return nil
+}
+
 func isValidEmail(email string) bool {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9.!#$%&'*+\/=?^_` + `"()` + `{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 	return emailRegex.MatchString(email)
@@ -73,7 +86,6 @@ func CreateJWToken(user model.User) (string, error) {
 		})
 
 	secret := os.Getenv("SECRET")
-	fmt.Println(secret)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", err
@@ -90,7 +102,6 @@ func CreateRefreshToken(user model.User) (string, error) {
 			"iss": "go-auth",
 		})
 	secret := os.Getenv("SECRET")
-	fmt.Println(secret)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return "", err

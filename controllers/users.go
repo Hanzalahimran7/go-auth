@@ -24,7 +24,52 @@ func GetController(db store.DatabaseStore) UserController {
 	}
 }
 
-func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
+func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, error) {
+	// The handler logs in existing users
+	loginRequest := model.LoginRequest{}
+	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
+		return http.StatusBadRequest, fmt.Errorf("INVALID REQUEST BODY")
+	}
+	log.Println("******----------------------*********")
+	// Input validation
+	if err := utils.ValidateLoginRequest(loginRequest); err != nil {
+		log.Printf("Invalid Login request: %v\nThe request body is %v\n", err, loginRequest)
+		return http.StatusBadRequest, err
+	}
+	log.Printf("User with email %s is logging in\n", loginRequest.Email)
+	user, err := uc.db.Login(r.Context(), loginRequest.Email, loginRequest.Password)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("%s Login request failed\n", loginRequest.Email)
+			return http.StatusNotFound, fmt.Errorf("USER %s NOT FOUND", loginRequest.Email)
+		} else {
+			log.Printf("%s Login request failed\n", loginRequest.Email)
+			return http.StatusBadRequest, err
+		}
+	}
+	jwtToken, err := utils.CreateJWToken(user)
+	if err != nil {
+		log.Printf("Error creating JWT for user %s : %v+\n", user.Email, err)
+		log.Printf("%s Login request failed\n", loginRequest.Email)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	refreshToken, err := utils.CreateRefreshToken(user)
+	if err != nil {
+		log.Printf("Error creating Refresh for user %s: %v+\n", user.Email, err)
+		log.Printf("%s Login request failed\n", loginRequest.Email)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	log.Printf("User %s logged in with email %s\n", user.Id, user.Email)
+	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id, time.Now().Add(time.Minute*2)); err != nil {
+		log.Printf("Failed to write token for %s to Database: %v+\n", user.Email, err)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	log.Printf("%s Login request Successful\n", loginRequest.Email)
+	w.Header().Add("Authorization", jwtToken)
+	w.Header().Add("Refresh", refreshToken)
+	utils.WriteJSON(w, http.StatusCreated, user)
+	return 0, nil
+}
 
 func (uc *UserController) Logout(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
 

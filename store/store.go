@@ -11,7 +11,7 @@ import (
 type DatabaseStore interface {
 	RunMigration() error
 	Signup(ctx context.Context, user *model.User) error
-	Login(ctx context.Context, username string, password string) (*model.User, error)
+	Login(ctx context.Context, email string, password string) (model.User, error)
 	GetUser(ctx context.Context, username string) (*model.User, error)
 	DeleteUser(ctx context.Context, username string) error
 	UpdateUser(ctx context.Context, user *model.User) error

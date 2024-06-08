@@ -70,6 +70,16 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 		CreatedAt: &createdAt,
 	}
 
+	jwtToken, err := utils.CreateJWToken(user)
+	if err != nil {
+		log.Printf("Error creating JWT for user %s : %v+\n", user.Email, err)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	refreshToken, err := utils.CreateRefreshToken(user)
+	if err != nil {
+		log.Printf("Error creating Refresh for user %s: %v+\n", user.Email, err)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
 	// Save the user in DB
 	log.Printf("Writing user %s to Database\n", userRequest.Email)
 	if err := uc.db.Signup(r.Context(), &user); err != nil {
@@ -78,7 +88,14 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
 	log.Printf("User %s created with email %s\n", user.Id, userRequest.Email)
+	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id, time.Now().Add(time.Minute*2)); err != nil {
+		log.Printf("Failed to write token for %s to Database: %v+\n", userRequest.Email, err)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
 	//Send the response to client
+	// Add JWT and Refresh Token to the auth header
+	w.Header().Add("Authorization", jwtToken)
+	w.Header().Add("Refresh", refreshToken)
 	utils.WriteJSON(w, http.StatusCreated, user)
 	return 0, nil
 }

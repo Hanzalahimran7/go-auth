@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hanzalahimran7/go-auth/model"
 )
 
@@ -14,4 +16,6 @@ type DatabaseStore interface {
 	DeleteUser(ctx context.Context, username string) error
 	UpdateUser(ctx context.Context, user *model.User) error
 	FindByEmail(ctx context.Context, email string) error
+	StoreToken(ctx context.Context, jwt string, userId uuid.UUID, expiresAt time.Time) error
+	GetTokenFromDB(ctx context.Context, userId string) (string, error)
 }

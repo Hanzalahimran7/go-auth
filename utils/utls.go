@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/hanzalahimran7/go-auth/model"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -57,4 +60,40 @@ func ValidateUserRequest(userRequest model.SignupRequest) error {
 func isValidEmail(email string) bool {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9.!#$%&'*+\/=?^_` + `"()` + `{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 	return emailRegex.MatchString(email)
+}
+
+func CreateJWToken(user model.User) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"id":    user.Id,
+			"email": user.Email,
+			"iat":   time.Now().Unix(),
+			"exp":   time.Now().Add(time.Minute * 1).Unix(),
+			"iss":   "go-auth",
+		})
+
+	secret := os.Getenv("SECRET")
+	fmt.Println(secret)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func CreateRefreshToken(user model.User) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"id":  user.Id,
+			"iat": time.Now().Unix(),
+			"exp": time.Now().Add(time.Minute * 2).Unix(),
+			"iss": "go-auth",
+		})
+	secret := os.Getenv("SECRET")
+	fmt.Println(secret)
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
 }

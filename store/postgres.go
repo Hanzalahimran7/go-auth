@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hanzalahimran7/go-auth/model"
 	_ "github.com/lib/pq"
 )
@@ -33,13 +35,21 @@ func NewPostgresDB(host, port, user, password, dbName string) *PostgresDB {
 
 func (p *PostgresDB) RunMigration() error {
 	query := `CREATE TABLE IF NOT EXISTS users (
-		id UUID PRIMARY KEY,
-		first_name VARCHAR(255) NOT NULL,
-		last_name VARCHAR(255) NOT NULL,
-		email VARCHAR(255) NOT NULL UNIQUE,
-		password VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP
-	);
+        id UUID PRIMARY KEY,
+        first_name VARCHAR(255) NOT NULL,
+        last_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id),
+        token VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP,
+        revoked BOOLEAN DEFAULT FALSE,
+        CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users(id)
+    );
 	`
 	_, err := p.db.Exec(string(query))
 	if err != nil {
@@ -90,4 +100,20 @@ func (p *PostgresDB) FindByEmail(ctx context.Context, email string) error {
 		return fmt.Errorf("email already exists")
 	}
 	return nil
+}
+
+func (p *PostgresDB) StoreToken(ctx context.Context, jwt string, userId uuid.UUID, expiresAt time.Time) error {
+	query := `
+        INSERT INTO refresh_tokens (user_id, token, expires_at, revoked)
+        VALUES ($1, $2, $3, $4)
+    `
+	_, err := p.db.ExecContext(ctx, query, userId, jwt, expiresAt, false)
+	if err != nil {
+		return fmt.Errorf("FAILED TO SAVE REFRESH TOKEN: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgresDB) GetTokenFromDB(ctx context.Context, userId string) (string, error) {
+	return "", nil
 }

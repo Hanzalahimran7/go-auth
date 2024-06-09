@@ -151,7 +151,23 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 	return 0, nil
 }
 
+func (uc *UserController) ForgotPassword(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
+
+func (uc *UserController) ResetPassword(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
+
+func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
+
 func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
+
+func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) (int, error) {
 	return 0, nil
 }
 
@@ -159,6 +175,10 @@ func (uc *UserController) DeleteProfile(w http.ResponseWriter, r *http.Request) 
 	return 0, nil
 }
 
-func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+func (uc *UserController) RefreshToken(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
+
+func (uc *UserController) VerifyToken(w http.ResponseWriter, r *http.Request) (int, error) {
 	return 0, nil
 }

@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -107,4 +110,67 @@ func CreateRefreshToken(user model.User) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+func VerifyJWTToken(tokenString string) (*jwt.Token, error) {
+	secret := os.Getenv("SECRET")
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func JwtVerify(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Println("*---------------------------*")
+		log.Println("Authorizing the user")
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			log.Println("Authorization header missing")
+			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Missing Authorization Header"})
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			log.Println("Invalid Authorization Header")
+			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Authorization Header"})
+			return
+		}
+
+		tokenString := parts[1]
+		claims := &jwt.MapClaims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			return []byte(os.Getenv("SECRET")), nil
+		})
+
+		if err != nil || !token.Valid {
+			log.Printf("Invalid Token: %v+\n", err)
+			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Token"})
+			return
+		}
+
+		userID, ok := (*claims)["id"].(string)
+		if !ok {
+			log.Println("Token does not contain user ID")
+			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Token"})
+			return
+		}
+
+		userEmail, ok := (*claims)["email"].(string)
+		if !ok {
+			log.Println("Token does not contain user email")
+			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Token"})
+			return
+		}
+		ctx := context.WithValue(r.Context(), "userID", userID)
+		ctx = context.WithValue(ctx, "userEmail", userEmail)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

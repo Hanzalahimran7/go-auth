@@ -90,8 +90,18 @@ func (p *PostgresDB) Login(ctx context.Context, email string, password string) (
 	return user, nil
 }
 
-func (p *PostgresDB) GetUser(ctx context.Context, username string) (*model.User, error) {
-	return nil, nil
+func (p *PostgresDB) GetUser(ctx context.Context, id string) (model.User, error) {
+	user := model.User{}
+	if err := p.db.QueryRow("SELECT id, first_name, last_name, email, created_at from users where id = $1", id).Scan(
+		&user.Id,
+		&user.FirstName,
+		&user.LastName,
+		&user.Email,
+		&user.CreatedAt,
+	); err != nil {
+		return model.User{}, err
+	}
+	return user, nil
 }
 
 func (p *PostgresDB) GetUsers(ctx context.Context) ([]*model.User, error) {
@@ -106,7 +116,7 @@ func (p *PostgresDB) UpdateUser(ctx context.Context, user *model.User) error {
 	return nil
 }
 
-func (p *PostgresDB) FindByEmail(ctx context.Context, email string) error {
+func (p *PostgresDB) CheckEmailExists(ctx context.Context, email string) error {
 	var emailInDB string
 	if err := p.db.QueryRow("SELECT email from users where email = $1", email).Scan(&emailInDB); err != nil {
 		return err

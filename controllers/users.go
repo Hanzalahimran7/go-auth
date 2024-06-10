@@ -92,7 +92,7 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 
 	// Check if email already exists
 	log.Printf("Checking if the email %s exists in DB\n", userRequest.Email)
-	err := uc.db.FindByEmail(r.Context(), userRequest.Email)
+	err := uc.db.CheckEmailExists(r.Context(), userRequest.Email)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Printf("Email %s already exists in Database\n", userRequest.Email)
@@ -164,6 +164,16 @@ func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request)
 }
 
 func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	id := r.Context().Value("userID")
+	email := r.Context().Value("userEmail")
+	log.Printf("User %s is getting profile\n", email)
+	user, err := uc.db.GetUser(r.Context(), id.(string))
+	if err != nil {
+		log.Printf("Failed to get user %s from Database\n", email)
+		log.Println(err)
+		return http.StatusInternalServerError, fmt.Errorf("USER NOT FOUND IN DATABASE")
+	}
+	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
 }
 
@@ -180,5 +190,12 @@ func (uc *UserController) RefreshToken(w http.ResponseWriter, r *http.Request) (
 }
 
 func (uc *UserController) VerifyToken(w http.ResponseWriter, r *http.Request) (int, error) {
+	var token string
+	err := json.NewDecoder(r.Body).Decode(&token)
+	if err != nil {
+		log.Println("*--------------------------*")
+		log.Printf("The request body is not valid %v+\n", err)
+		return http.StatusBadRequest, fmt.Errorf("TOKEN MISSING IN THE RESQUEST BODY")
+	}
 	return 0, nil
 }

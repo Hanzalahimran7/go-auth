@@ -104,16 +104,23 @@ func (p *PostgresDB) GetUser(ctx context.Context, id string) (model.User, error)
 	return user, nil
 }
 
-func (p *PostgresDB) GetUsers(ctx context.Context) ([]*model.User, error) {
-	return nil, nil
-}
-
 func (p *PostgresDB) DeleteUser(ctx context.Context, username string) error {
 	return nil
 }
 
-func (p *PostgresDB) UpdateUser(ctx context.Context, user *model.User) error {
-	return nil
+func (p *PostgresDB) UpdateUser(ctx context.Context, user model.EditUserRequest, id string) (model.User, error) {
+	updateUser := model.User{}
+	if err := p.db.QueryRow("UPDATE users SET first_name = $1, last_name = $2, email = $3 WHERE id = $4 RETURNING id, first_name, last_name, email, created_at",
+		user.FirstName, user.LastName, user.Email, id).Scan(
+		&updateUser.Id,
+		&updateUser.FirstName,
+		&updateUser.LastName,
+		&updateUser.Email,
+		&updateUser.CreatedAt,
+	); err != nil {
+		return model.User{}, err
+	}
+	return updateUser, nil
 }
 
 func (p *PostgresDB) CheckEmailExists(ctx context.Context, email string) error {

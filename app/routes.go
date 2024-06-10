@@ -7,7 +7,7 @@ func (a *App) LoadRoutes() {
 	a.Router.Post("/register", utils.ApiFunc(a.Controller.Register))
 	// Profile management
 	a.Router.With(utils.JwtVerify).Get("/profile", utils.ApiFunc(a.Controller.GetProfile))
-	a.Router.With(utils.JwtVerify).Patch("/profile", utils.ApiFunc(a.Controller.EditProfile))
+	a.Router.With(utils.JwtVerify).Put("/profile", utils.ApiFunc(a.Controller.EditProfile))
 	a.Router.With(utils.JwtVerify).Delete("/profile", utils.ApiFunc(a.Controller.DeleteProfile))
 
 	// Password management

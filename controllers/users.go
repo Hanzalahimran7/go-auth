@@ -167,19 +167,38 @@ func (uc *UserController) ChangePassword(w http.ResponseWriter, r *http.Request)
 
 func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) (int, error) {
 	id := r.Context().Value("userID")
-	email := r.Context().Value("userEmail")
-	log.Printf("User %s is getting profile\n", email)
+	log.Printf("User %s is getting profile\n", id)
 	user, err := uc.db.GetUser(r.Context(), id.(string))
 	if err != nil {
-		log.Printf("Failed to get user %s from Database\n", email)
+		log.Printf("Failed to get user %s from Database\n", id)
 		log.Println(err)
 		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
 	}
+	log.Println("Got profile successfully")
 	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
 }
 
 func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	body := model.EditUserRequest{}
+	id := r.Context().Value("userID")
+	log.Printf("User %s is getting profile\n", id)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("The request body is not valid %v+\n", err)
+		return http.StatusBadRequest, fmt.Errorf("BAD REQUEST BODY")
+	}
+	if err := utils.ValidateEditRequest(body); err != nil {
+		log.Printf("Invalid edit request: %v\nThe request body is %v\n", err, body)
+		return http.StatusBadRequest, err
+	}
+	user, err := uc.db.UpdateUser(r.Context(), body, id.(string))
+	if err != nil {
+		log.Printf("Failed to edit user %s from Database\n", id)
+		log.Println(err)
+		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
+	}
+	log.Println("Edited profile successfully")
+	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
 }
 

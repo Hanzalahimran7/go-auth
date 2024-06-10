@@ -73,6 +73,16 @@ func ValidateLoginRequest(userRequest model.LoginRequest) error {
 	return nil
 }
 
+func ValidateEditRequest(userRequest model.EditUserRequest) error {
+	if userRequest.Email == "" || userRequest.FirstName == "" || userRequest.LastName == "" {
+		return fmt.Errorf("all fields are required")
+	}
+	if !isValidEmail(userRequest.Email) {
+		return fmt.Errorf("invalid email address")
+	}
+	return nil
+}
+
 func isValidEmail(email string) bool {
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9.!#$%&'*+\/=?^_` + `"()` + `{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$`)
 	return emailRegex.MatchString(email)
@@ -81,11 +91,10 @@ func isValidEmail(email string) bool {
 func CreateJWToken(user model.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"id":    user.Id,
-			"email": user.Email,
-			"iat":   time.Now().Unix(),
-			"exp":   time.Now().Add(time.Minute * 1).Unix(),
-			"iss":   "go-auth",
+			"id":  user.Id,
+			"iat": time.Now().Unix(),
+			"exp": time.Now().Add(time.Minute * 1).Unix(),
+			"iss": "go-auth",
 		})
 
 	secret := os.Getenv("SECRET")
@@ -100,9 +109,7 @@ func CreateRefreshToken(user model.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"id":  user.Id,
-			"iat": time.Now().Unix(),
 			"exp": time.Now().Add(time.Minute * 2).Unix(),
-			"iss": "go-auth",
 		})
 	secret := os.Getenv("SECRET")
 	tokenString, err := token.SignedString([]byte(secret))
@@ -162,15 +169,7 @@ func JwtVerify(next http.Handler) http.Handler {
 			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Token"})
 			return
 		}
-
-		userEmail, ok := (*claims)["email"].(string)
-		if !ok {
-			log.Println("Token does not contain user email")
-			WriteJSON(w, http.StatusUnauthorized, APIError{Error: "Invalid Token"})
-			return
-		}
 		ctx := context.WithValue(r.Context(), "userID", userID)
-		ctx = context.WithValue(ctx, "userEmail", userEmail)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -76,7 +76,9 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, er
 	return 0, nil
 }
 
-func (uc *UserController) Logout(w http.ResponseWriter, r *http.Request) (int, error) { return 0, nil }
+func (uc *UserController) Logout(w http.ResponseWriter, r *http.Request) (int, error) {
+	return 0, nil
+}
 
 func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int, error) {
 	// The handler register a new user into the system
@@ -197,12 +199,22 @@ func (uc *UserController) EditProfile(w http.ResponseWriter, r *http.Request) (i
 		log.Println(err)
 		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
 	}
-	log.Println("Edited profile successfully")
+	log.Println("Editeds profile successfully")
 	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
 }
 
 func (uc *UserController) DeleteProfile(w http.ResponseWriter, r *http.Request) (int, error) {
+	id := r.Context().Value("userID")
+	log.Printf("User %s is Deleting profile\n", id)
+	err := uc.db.DeleteUser(r.Context(), id.(string))
+	if err != nil {
+		log.Printf("Failed to delete user %s from Database\n", id)
+		log.Println(err)
+		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
+	}
+	log.Println("Deleted profile successfully")
+	utils.WriteJSON(w, http.StatusOK, nil)
 	return 0, nil
 }
 

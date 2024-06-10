@@ -45,7 +45,7 @@ func (p *PostgresDB) RunMigration() error {
     );
     CREATE TABLE IF NOT EXISTS refresh_tokens (
         id SERIAL PRIMARY KEY,
-        user_id UUID NOT NULL REFERENCES users(id),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         token VARCHAR(255) NOT NULL,
         expires_at TIMESTAMP,
         revoked BOOLEAN DEFAULT FALSE,
@@ -104,7 +104,16 @@ func (p *PostgresDB) GetUser(ctx context.Context, id string) (model.User, error)
 	return user, nil
 }
 
-func (p *PostgresDB) DeleteUser(ctx context.Context, username string) error {
+func (p *PostgresDB) DeleteUser(ctx context.Context, id string) error {
+	// Check if user exists
+	var userId string
+	if err := p.db.QueryRow("SELECT id from users where id = $1", id).Scan(&userId); err != nil {
+		return err
+	}
+	_, err := p.db.Exec("DELETE FROM users WHERE id = $1", id)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -142,6 +151,19 @@ func (p *PostgresDB) StoreToken(ctx context.Context, jwt string, userId uuid.UUI
 	_, err := p.db.ExecContext(ctx, query, userId, jwt, expiresAt, false)
 	if err != nil {
 		return fmt.Errorf("FAILED TO SAVE REFRESH TOKEN: %v", err)
+	}
+	return nil
+}
+
+func (p *PostgresDB) RevokeToken(ctx context.Context, userId string) error {
+	query := `
+        UPDATE refresh_tokens
+        SET revoked = true
+        WHERE user_id = $1;
+    `
+	_, err := p.db.ExecContext(ctx, query, userId)
+	if err != nil {
+		return fmt.Errorf("FAILED TO REVOKE TOKEN: %v", err)
 	}
 	return nil
 }

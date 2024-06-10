@@ -87,6 +87,9 @@ func (p *PostgresDB) Login(ctx context.Context, email string, password string) (
 	if !utils.CheckPasswordHash(password, user.Password) {
 		return model.User{}, fmt.Errorf("INVALID PASSWORD")
 	}
+	if err := p.DeleteToken(ctx, user.Id); err != nil {
+		return model.User{}, err
+	}
 	return user, nil
 }
 
@@ -143,7 +146,7 @@ func (p *PostgresDB) CheckEmailExists(ctx context.Context, email string) error {
 	return nil
 }
 
-func (p *PostgresDB) StoreToken(ctx context.Context, jwt string, userId uuid.UUID, expiresAt time.Time) error {
+func (p *PostgresDB) StoreToken(ctx context.Context, jwt string, userId string, expiresAt time.Time) error {
 	query := `
         INSERT INTO refresh_tokens (user_id, token, expires_at, revoked)
         VALUES ($1, $2, $3, $4)
@@ -168,6 +171,27 @@ func (p *PostgresDB) RevokeToken(ctx context.Context, userId string) error {
 	return nil
 }
 
-func (p *PostgresDB) GetTokenFromDB(ctx context.Context, userId string) (string, error) {
-	return "", nil
+func (p *PostgresDB) CheckTokenStatus(ctx context.Context, userId, token string) error {
+	var revoked bool
+	var dbToken string
+	if err := p.db.QueryRow("SELECT token, revoked from refresh_tokens where user_id = $1", userId).Scan(&dbToken, &revoked); err != nil {
+		return err
+	}
+	log.Println(dbToken, token)
+	if revoked || dbToken != token {
+		return fmt.Errorf("TOKEN IS REVOKED")
+	}
+	return nil
+}
+
+func (p *PostgresDB) DeleteToken(ctx context.Context, userId uuid.UUID) error {
+	query := `
+        DELETE FROM refresh_tokens
+        WHERE user_id = $1;
+    `
+	_, err := p.db.ExecContext(ctx, query, userId)
+	if err != nil {
+		return fmt.Errorf("FAILED TO DELETE TOKEN: %v", err)
+	}
+	return nil
 }

@@ -49,20 +49,20 @@ func (uc *UserController) Login(w http.ResponseWriter, r *http.Request) (int, er
 			return http.StatusBadRequest, err
 		}
 	}
-	jwtToken, err := utils.CreateJWToken(user)
+	jwtToken, err := utils.CreateJWToken(user.Id.String())
 	if err != nil {
 		log.Printf("Error creating JWT for user %s : %v+\n", user.Email, err)
 		log.Printf("%s Login request failed\n", loginRequest.Email)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-	refreshToken, err := utils.CreateRefreshToken(user)
+	refreshToken, err := utils.CreateRefreshToken(user.Id.String())
 	if err != nil {
 		log.Printf("Error creating Refresh for user %s: %v+\n", user.Email, err)
 		log.Printf("%s Login request failed\n", loginRequest.Email)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
 	log.Printf("User %s logged in with email %s\n", user.Id, user.Email)
-	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id, time.Now().Add(time.Minute*2)); err != nil {
+	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id.String(), time.Now().Add(time.Minute*2)); err != nil {
 		log.Printf("Failed to write token for %s to Database: %v+\n", user.Email, err)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
@@ -122,12 +122,12 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 		CreatedAt: &createdAt,
 	}
 
-	jwtToken, err := utils.CreateJWToken(user)
+	jwtToken, err := utils.CreateJWToken(user.Id.String())
 	if err != nil {
 		log.Printf("Error creating JWT for user %s : %v+\n", user.Email, err)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
-	refreshToken, err := utils.CreateRefreshToken(user)
+	refreshToken, err := utils.CreateRefreshToken(user.Id.String())
 	if err != nil {
 		log.Printf("Error creating Refresh for user %s: %v+\n", user.Email, err)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
@@ -140,7 +140,7 @@ func (uc *UserController) Register(w http.ResponseWriter, r *http.Request) (int,
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
 	log.Printf("User %s created with email %s\n", user.Id, userRequest.Email)
-	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id, time.Now().Add(time.Minute*2)); err != nil {
+	if err := uc.db.StoreToken(r.Context(), refreshToken, user.Id.String(), time.Now().Add(time.Minute*2)); err != nil {
 		log.Printf("Failed to write token for %s to Database: %v+\n", userRequest.Email, err)
 		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
 	}
@@ -214,11 +214,71 @@ func (uc *UserController) DeleteProfile(w http.ResponseWriter, r *http.Request) 
 		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
 	}
 	log.Println("Deleted profile successfully")
-	utils.WriteJSON(w, http.StatusOK, nil)
+	var res struct {
+		Status string `json:"status"`
+	}
+	res.Status = "success"
+	utils.WriteJSON(w, http.StatusOK, res)
 	return 0, nil
 }
 
 func (uc *UserController) RefreshToken(w http.ResponseWriter, r *http.Request) (int, error) {
+	var body struct {
+		Token string `json:"token"`
+	}
+	log.Println("*--------------------------*")
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Printf("The request body is not valid %v+\n", err)
+		return http.StatusBadRequest, fmt.Errorf("BAD REQUEST BODY")
+	}
+	claims := &jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(body.Token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+	if err != nil || !token.Valid {
+		log.Printf("Invalid Token: %v+\n", err)
+		return http.StatusBadRequest, fmt.Errorf("INVALID TOKEN")
+	}
+	userID, ok := (*claims)["id"].(string)
+	if !ok {
+		log.Println("Token does not contain user ID")
+		return http.StatusBadRequest, fmt.Errorf("INVALID TOKEN")
+	}
+	_, err = uc.db.GetUser(r.Context(), userID)
+	if err != nil {
+		log.Println("Failed to get user from Database")
+		log.Println(err)
+		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
+	}
+	err = uc.db.CheckTokenStatus(r.Context(), userID, body.Token)
+	if err != nil {
+		log.Println("Token status is revoked")
+		log.Println(err)
+		return http.StatusBadRequest, fmt.Errorf("TOKEN IS NOT VALID")
+	}
+	jwtToken, err := utils.CreateJWToken(userID)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	refreshToken, err := utils.CreateRefreshToken(userID)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	log.Println("Storing new refresh token in db")
+	if err := uc.db.StoreToken(r.Context(), refreshToken, userID, time.Now().Add(time.Minute*2)); err != nil {
+		log.Printf("Failed to write token to Database: %v+\n", err)
+		return http.StatusInternalServerError, fmt.Errorf("INTERNAL SERVER ERROR")
+	}
+	var res struct {
+		ID           string `json:"id"`
+		Token        string `json:"auth-token"`
+		RefreshToken string `json:"refresh-token"`
+	}
+	res.ID = userID
+	res.Token = jwtToken
+	res.RefreshToken = refreshToken
+
+	utils.WriteJSON(w, http.StatusOK, res)
 	return 0, nil
 }
 

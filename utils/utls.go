@@ -88,10 +88,10 @@ func isValidEmail(email string) bool {
 	return emailRegex.MatchString(email)
 }
 
-func CreateJWToken(user model.User) (string, error) {
+func CreateJWToken(user string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"id":  user.Id,
+			"id":  user,
 			"iat": time.Now().Unix(),
 			"exp": time.Now().Add(time.Minute * 1).Unix(),
 			"iss": "go-auth",
@@ -105,10 +105,10 @@ func CreateJWToken(user model.User) (string, error) {
 	return tokenString, nil
 }
 
-func CreateRefreshToken(user model.User) (string, error) {
+func CreateRefreshToken(user string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"id":  user.Id,
+			"id":  user,
 			"exp": time.Now().Add(time.Minute * 2).Unix(),
 		})
 	secret := os.Getenv("SECRET")

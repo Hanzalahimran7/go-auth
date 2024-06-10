@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/hanzalahimran7/go-auth/model"
 	"github.com/hanzalahimran7/go-auth/store"
@@ -171,7 +173,7 @@ func (uc *UserController) GetProfile(w http.ResponseWriter, r *http.Request) (in
 	if err != nil {
 		log.Printf("Failed to get user %s from Database\n", email)
 		log.Println(err)
-		return http.StatusInternalServerError, fmt.Errorf("USER NOT FOUND IN DATABASE")
+		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
 	}
 	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
@@ -190,12 +192,37 @@ func (uc *UserController) RefreshToken(w http.ResponseWriter, r *http.Request) (
 }
 
 func (uc *UserController) VerifyToken(w http.ResponseWriter, r *http.Request) (int, error) {
-	var token string
-	err := json.NewDecoder(r.Body).Decode(&token)
-	if err != nil {
-		log.Println("*--------------------------*")
+	var requestToken struct {
+		Token string `json:"token"`
+	}
+	log.Println("*--------------------------*")
+	err := json.NewDecoder(r.Body).Decode(&requestToken)
+	if err != nil || requestToken.Token == "" {
 		log.Printf("The request body is not valid %v+\n", err)
 		return http.StatusBadRequest, fmt.Errorf("TOKEN MISSING IN THE RESQUEST BODY")
 	}
+	claims := &jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(requestToken.Token, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET")), nil
+	})
+
+	if err != nil || !token.Valid {
+		log.Printf("Invalid Token: %v+\n", err)
+		return http.StatusBadRequest, fmt.Errorf("INVALID TOKEN")
+	}
+
+	userID, ok := (*claims)["id"].(string)
+	if !ok {
+		log.Println("Token does not contain user ID")
+		return http.StatusBadRequest, fmt.Errorf("INVALID TOKEN")
+	}
+	user, err := uc.db.GetUser(r.Context(), userID)
+	if err != nil {
+		log.Println("Failed to get user from Database")
+		log.Println(err)
+		return http.StatusBadRequest, fmt.Errorf("USER NOT FOUND IN DATABASE")
+	}
+	log.Println("Verified token successfully")
+	utils.WriteJSON(w, http.StatusOK, user)
 	return 0, nil
 }
